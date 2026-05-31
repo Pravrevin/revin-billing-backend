@@ -1,0 +1,105 @@
+{
+  "_note": "Sample purchase bills for the current DB (item ids 1-4, supplier ids 1=MedPlus, 2=ABC Pharma, payment modes 1=Cash 2=Cheque 3=Credit 4=UPI 5=Card). Each element of 'purchases' is directly postable to POST /api/v1/purchases/. After creating a purchase, optionally record its payment via POST /api/v1/payments/ using the matching entry in 'payments' (set reference_id to the new purchase id; omit/skip for Credit).",
+
+  "purchases": [
+    {
+      "supplier_id": 1,
+      "invoice_no": "PUR-2026-0001",
+      "invoice_date": "2026-05-31",
+      "entry_date": "2026-05-31",
+      "due_date": "2026-06-30",
+      "items": [
+        {
+          "item_id": 1,
+          "batch_no": "PCM2401",
+          "quantity": 100,
+          "free_quantity": 10,
+          "purchase_rate": 8,
+          "mrp": 15,
+          "sale_rate": 13,
+          "discount": 0,
+          "gst_percent": 12,
+          "expiry_date": "2027-06-30"
+        },
+        {
+          "item_id": 2,
+          "batch_no": "ASC1102",
+          "quantity": 50,
+          "free_quantity": 5,
+          "purchase_rate": 78,
+          "mrp": 110,
+          "sale_rate": 100,
+          "discount": 2,
+          "gst_percent": 12,
+          "expiry_date": "2026-12-31"
+        },
+        {
+          "item_id": 3,
+          "batch_no": "VOL3309",
+          "quantity": 40,
+          "free_quantity": 0,
+          "purchase_rate": 95,
+          "mrp": 145,
+          "sale_rate": 132,
+          "discount": 0,
+          "gst_percent": 18,
+          "expiry_date": "2027-03-31"
+        }
+      ]
+    },
+    {
+      "supplier_id": 2,
+      "invoice_no": "PUR-2026-0002",
+      "invoice_date": "2026-05-31",
+      "entry_date": "2026-05-31",
+      "due_date": "2026-06-30",
+      "items": [
+        {
+          "item_id": 4,
+          "batch_no": "AMX5521",
+          "quantity": 80,
+          "free_quantity": 8,
+          "purchase_rate": 22,
+          "mrp": 42,
+          "sale_rate": 38,
+          "discount": 0,
+          "gst_percent": 12,
+          "expiry_date": "2026-10-31"
+        },
+        {
+          "item_id": 1,
+          "batch_no": "PCM2402",
+          "quantity": 60,
+          "free_quantity": 5,
+          "purchase_rate": 8.5,
+          "mrp": 15,
+          "sale_rate": 13,
+          "discount": 0,
+          "gst_percent": 12,
+          "expiry_date": "2027-08-31"
+        }
+      ]
+    }
+  ],
+
+  "payments": [
+    {
+      "for_invoice_no": "PUR-2026-0001",
+      "party_id": 1,
+      "txn_type": "PAYMENT",
+      "reference_type": "purchase",
+      "reference_id": null,
+      "txn_date": "2026-05-31",
+      "amount": null,
+      "payment_mode_id": 1,
+      "mode": "Cash",
+      "reference_no": null,
+      "_hint": "Cash, full payment. Set amount to the created invoice net_amount and reference_id to the new purchase id."
+    },
+    {
+      "for_invoice_no": "PUR-2026-0002",
+      "mode": "Credit",
+      "_hint": "Booked on credit — do NOT create a payment now. Pay later from Supplier Ledger (UPI/Cheque with receipt)."
+    }
+  ]
+}

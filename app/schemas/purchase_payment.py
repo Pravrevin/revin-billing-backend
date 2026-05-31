@@ -67,6 +67,7 @@ class PaymentMasterResponse(BaseModel):
     payment_mode_name: Optional[str]  = None
     reference_no:      Optional[str]  = None
     notes:             Optional[str]  = None
+    receipt_path:      Optional[str]  = None   # URL of uploaded receipt, if any
     created_at:        datetime
     updated_at:        datetime
 
@@ -150,3 +151,41 @@ class PartyOutstandingSummary(BaseModel):
     invoice_count:      int            = 0
     overdue_count:      int            = 0
     credit_days:        int            = 30
+
+
+# ── Supplier (creditor) ledger — industry-standard statement ────────────────────
+
+class SupplierLedgerRow(BaseModel):
+    """
+    One line of a supplier account statement (buyer's books, creditor account).
+
+      Purchase Invoice  → CREDIT (our payable to the supplier increases)
+      Payment made      → DEBIT  (payable decreases)
+
+    `balance` is the absolute running balance and `balance_type` is 'Cr'
+    (we still owe the supplier) or 'Dr' (we are in advance / overpaid).
+    """
+    entry_date:   date
+    particulars:  str                       # "Purchase Invoice", "Payment - Cash", "Opening Balance"
+    voucher_type: str                       # Opening / Purchase / Payment
+    voucher_no:   Optional[str] = None
+    debit:        Decimal       = Decimal("0")
+    credit:       Decimal       = Decimal("0")
+    balance:      Decimal       = Decimal("0")
+    balance_type: str           = "Cr"
+
+
+class SupplierLedgerResponse(BaseModel):
+    party_id:             int
+    party_name:           Optional[str] = None
+    party_code:           Optional[str] = None
+    gstin:                Optional[str] = None
+    from_date:            Optional[date] = None
+    to_date:              Optional[date] = None
+    opening_balance:      Decimal = Decimal("0")
+    opening_balance_type: str     = "Cr"
+    rows:                 List[SupplierLedgerRow] = []
+    total_debit:          Decimal = Decimal("0")
+    total_credit:         Decimal = Decimal("0")
+    closing_balance:      Decimal = Decimal("0")
+    closing_balance_type: str     = "Cr"

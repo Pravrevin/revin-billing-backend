@@ -1,0 +1,22 @@
+[
+  {
+    "brand_name": "Sun Pharma",
+    "is_active": true
+  },
+  {
+    "brand_name": "Cipla",
+    "is_active": true
+  },
+  {
+    "brand_name": "Dr. Reddy's",
+    "is_active": true
+  },
+  {
+    "brand_name": "GSK",
+    "is_active": true
+  },
+  {
+    "brand_name": "Pfizer",
+    "is_active": true
+  }
+]

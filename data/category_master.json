@@ -1,0 +1,27 @@
+[
+  {
+    "category_name": "Antibiotics",
+    "description": "Medicines used to treat bacterial infections",
+    "is_active": true
+  },
+  {
+    "category_name": "Antidiabetic",
+    "description": "Medicines used to manage blood sugar levels in diabetes",
+    "is_active": true
+  },
+  {
+    "category_name": "Antihistamine",
+    "description": "Medicines used to relieve allergic reactions and symptoms",
+    "is_active": true
+  },
+  {
+    "category_name": "Gastrointestinal",
+    "description": "Medicines used for digestive system disorders and rehydration",
+    "is_active": true
+  },
+  {
+    "category_name": "Analgesic",
+    "description": "Pain relieving medicines and anti-inflammatory drugs",
+    "is_active": true
+  }
+]

@@ -58,6 +58,22 @@ class StockMasterResponse(StockMasterBase):
     model_config = {"from_attributes": True}
 
 
+# ── Stock Expiry ─────────────────────────────────────────────────────────────
+
+class StockExpiryRow(BaseModel):
+    id:               int
+    item_id:          int
+    item_name:        Optional[str]     = None
+    batch_no:         Optional[str]     = None
+    manufacture_date: Optional[date]    = None
+    expiry_date:      Optional[date]    = None
+    quantity:         Optional[Decimal] = None
+    mrp:              Optional[Decimal] = None
+    sale_rate:        Optional[Decimal] = None
+    days_to_expiry:   Optional[int]     = None   # negative = already expired
+    status:           str               = "ok"   # expired / near / ok
+
+
 # ── Stock Ledger ───────────────────────────────────────────────────────────────
 
 class StockLedgerResponse(BaseModel):

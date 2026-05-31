@@ -1,0 +1,32 @@
+[
+  {
+    "packing_type": "Strip",
+    "unit_primary": "Strip",
+    "unit_secondary": "Tablet",
+    "is_active": true
+  },
+  {
+    "packing_type": "Bottle",
+    "unit_primary": "Bottle",
+    "unit_secondary": "ml",
+    "is_active": true
+  },
+  {
+    "packing_type": "Tube",
+    "unit_primary": "Tube",
+    "unit_secondary": "gm",
+    "is_active": true
+  },
+  {
+    "packing_type": "Box",
+    "unit_primary": "Box",
+    "unit_secondary": "Sachet",
+    "is_active": true
+  },
+  {
+    "packing_type": "Vial",
+    "unit_primary": "Vial",
+    "unit_secondary": "ml",
+    "is_active": true
+  }
+]

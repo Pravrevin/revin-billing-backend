@@ -1,0 +1,22 @@
+[
+  {
+    "unit_name": "Tablet",
+    "is_active": true
+  },
+  {
+    "unit_name": "Capsule",
+    "is_active": true
+  },
+  {
+    "unit_name": "ml",
+    "is_active": true
+  },
+  {
+    "unit_name": "gm",
+    "is_active": true
+  },
+  {
+    "unit_name": "Sachet",
+    "is_active": true
+  }
+]

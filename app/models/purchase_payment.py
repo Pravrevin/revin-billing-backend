@@ -49,6 +49,7 @@ class PaymentMaster(Base):
                              nullable=True)
     reference_no    = Column(String(100))
     notes           = Column(Text)
+    receipt_path    = Column(String(255))   # uploaded receipt image (UPI / Card)
 
     created_at      = Column(TIMESTAMP, default=datetime.utcnow)
     updated_at      = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)

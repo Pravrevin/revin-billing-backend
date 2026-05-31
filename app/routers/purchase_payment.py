@@ -26,11 +26,14 @@ Party ledger & summary
   GET    /parties/{id}/outstanding-summary   Balance totals
 """
 
-from datetime import date, timedelta
+import os
+import re
+import shutil
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -48,9 +51,18 @@ from app.schemas.purchase_payment import (
     PaymentMasterCreate,
     PaymentMasterResponse,
     PaymentMasterUpdate,
+    SupplierLedgerResponse,
+    SupplierLedgerRow,
 )
 
 router = APIRouter(tags=["Payments & Ledger"])
+
+# ── Receipt upload config ────────────────────────────────────────────────────────
+# Images are stored on disk under data/payment_receipts/ and served read-only
+# under the /media/payment-receipts URL prefix (mounted in app/main.py).
+RECEIPTS_DIR        = os.path.join(os.path.dirname(__file__), "..", "..", "data", "payment_receipts")
+RECEIPTS_URL_PREFIX = "/media/payment-receipts"
+ALLOWED_RECEIPT_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"}
 
 
 # ── internal helpers ───────────────────────────────────────────────────────────
@@ -70,6 +82,7 @@ def _pay_to_response(pay: PaymentMaster, doc_no: Optional[str] = None) -> Paymen
         payment_mode_name = pay.payment_mode.mode_name     if pay.payment_mode else None,
         reference_no      = pay.reference_no,
         notes             = pay.notes,
+        receipt_path      = pay.receipt_path,
         created_at        = pay.created_at,
         updated_at        = pay.updated_at,
     )
@@ -337,6 +350,52 @@ def delete_payment(payment_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
+# ── Payment receipt upload (UPI / Card proof) ───────────────────────────────────
+
+@router.post("/payments/{payment_id}/receipt", response_model=PaymentMasterResponse)
+def upload_payment_receipt(
+    payment_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Attach a payment receipt image (e.g. UPI / Card slip) to a payment.
+
+    The file is saved under data/payment_receipts/ with a descriptive name
+    (`payment_<id>_<timestamp>_<original>.<ext>`) and the public URL is stored
+    on the payment's `receipt_path`, served read-only under /media/payment-receipts.
+    """
+    pay = db.query(PaymentMaster).filter(PaymentMaster.id == payment_id).first()
+    if not pay:
+        raise HTTPException(404, "Payment not found.")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_RECEIPT_EXT:
+        raise HTTPException(
+            400,
+            f"Unsupported file type '{ext or '?'}'. Allowed: {', '.join(sorted(ALLOWED_RECEIPT_EXT))}",
+        )
+
+    os.makedirs(RECEIPTS_DIR, exist_ok=True)
+    raw_stem  = os.path.splitext(os.path.basename(file.filename or "receipt"))[0]
+    safe_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", raw_stem)[:40] or "receipt"
+    stamp     = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    filename  = f"payment_{payment_id}_{stamp}_{safe_stem}{ext}"
+    dest      = os.path.join(RECEIPTS_DIR, filename)
+
+    with open(dest, "wb") as out:
+        shutil.copyfileobj(file.file, out)
+
+    pay.receipt_path = f"{RECEIPTS_URL_PREFIX}/{filename}"
+    db.commit()
+
+    pay = db.query(PaymentMaster).options(
+        joinedload(PaymentMaster.party),
+        joinedload(PaymentMaster.payment_mode),
+    ).filter(PaymentMaster.id == payment_id).first()
+    return _pay_to_response(pay)
+
+
 # ── Outstanding purchase invoices ──────────────────────────────────────────────
 
 @router.get("/purchases/outstanding", response_model=List[OutstandingInvoice])
@@ -503,6 +562,89 @@ def distributor_invoice_payments(
 
     pays = _load_pays_for(db, "purchase", invoice_id)
     return [_pay_to_response(p, invoice.invoice_no) for p in pays]
+
+
+# ── Supplier (creditor) ledger — industry-standard statement ────────────────────
+
+@router.get("/distributors/{distributor_id}/ledger", response_model=SupplierLedgerResponse)
+def distributor_ledger(
+    distributor_id: int,
+    date_from: Optional[date] = Query(None, description="entries on/after this date"),
+    date_to:   Optional[date] = Query(None, description="entries on/before this date"),
+    db:        Session        = Depends(get_db),
+):
+    """
+    Supplier account statement (buyer's books, creditor account):
+
+      • Opening balance (from party_master.opening_balance) — Cr if we owe.
+      • Purchase invoices  → CREDIT (payable increases).
+      • Payments made      → DEBIT  (payable decreases).
+      • Running balance shown as Dr / Cr, with closing balance + totals.
+    """
+    party = db.query(PartyMaster).filter(PartyMaster.id == distributor_id).first()
+    if not party:
+        raise HTTPException(404, "Supplier not found.")
+
+    opening = party.opening_balance or Decimal("0")   # +ve = Cr (we owe)
+
+    # (date, order, voucher_type, particulars, voucher_no, debit, credit)
+    raw: List[tuple] = []
+
+    pq = db.query(PurchaseMaster).filter(PurchaseMaster.supplier_id == distributor_id)
+    if date_from: pq = pq.filter(PurchaseMaster.invoice_date >= date_from)
+    if date_to:   pq = pq.filter(PurchaseMaster.invoice_date <= date_to)
+    for p in pq.all():
+        d = p.invoice_date or p.entry_date or (p.created_at.date() if p.created_at else date.today())
+        raw.append((d, 0, "Purchase", "Purchase Invoice", p.invoice_no, Decimal("0"), p.net_amount or Decimal("0")))
+
+    paysq = (
+        db.query(PaymentMaster)
+        .options(joinedload(PaymentMaster.payment_mode))
+        .filter(PaymentMaster.party_id == distributor_id, PaymentMaster.txn_type == "PAYMENT")
+    )
+    if date_from: paysq = paysq.filter(PaymentMaster.txn_date >= date_from)
+    if date_to:   paysq = paysq.filter(PaymentMaster.txn_date <= date_to)
+    for pay in paysq.all():
+        mode = pay.payment_mode.mode_name if pay.payment_mode else ""
+        particulars = f"Payment - {mode}" if mode else "Payment"
+        raw.append((pay.txn_date, 1, "Payment", particulars, pay.reference_no, pay.amount or Decimal("0"), Decimal("0")))
+
+    raw.sort(key=lambda r: (r[0], r[1]))
+
+    running      = opening
+    total_debit  = Decimal("0")
+    total_credit = Decimal("0")
+    rows: List[SupplierLedgerRow] = []
+    for (d, _ord, vtype, particulars, vno, debit, credit) in raw:
+        running       += credit - debit
+        total_debit   += debit
+        total_credit  += credit
+        rows.append(SupplierLedgerRow(
+            entry_date   = d,
+            particulars  = particulars,
+            voucher_type = vtype,
+            voucher_no   = vno,
+            debit        = debit,
+            credit       = credit,
+            balance      = abs(running),
+            balance_type = "Cr" if running >= 0 else "Dr",
+        ))
+
+    return SupplierLedgerResponse(
+        party_id             = party.id,
+        party_name           = party.party_name,
+        party_code           = party.party_code,
+        gstin                = party.gstin,
+        from_date            = date_from,
+        to_date              = date_to,
+        opening_balance      = abs(opening),
+        opening_balance_type = "Cr" if opening >= 0 else "Dr",
+        rows                 = rows,
+        total_debit          = total_debit,
+        total_credit         = total_credit,
+        closing_balance      = abs(running),
+        closing_balance_type = "Cr" if running >= 0 else "Dr",
+    )
 
 
 # ── Party running ledger ───────────────────────────────────────────────────────

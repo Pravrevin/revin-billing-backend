@@ -417,7 +417,9 @@ CREATE TABLE IF NOT EXISTS purchase_items (
     mrp             NUMERIC(10,2),
     sale_rate       NUMERIC(10,2),
 
-    discount        NUMERIC(10,2),
+    gross_amount    NUMERIC(12,2),
+    discount        NUMERIC(5,2),
+    discount_amount NUMERIC(10,2),
     gst_percent     NUMERIC(5,2),
     tax_amount      NUMERIC(10,2),
 
@@ -577,6 +579,7 @@ CREATE TABLE IF NOT EXISTS payment_master (
     payment_mode_id     BIGINT REFERENCES payment_mode_master(id) ON DELETE SET NULL,
     reference_no        VARCHAR(100),       -- cheque no / UTR / UPI ref
     notes               TEXT,
+    receipt_path        VARCHAR(255),       -- uploaded receipt image (UPI / Card), served under /media/payment-receipts
 
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -592,4 +595,125 @@ CREATE INDEX IF NOT EXISTS idx_payment_master_mode_id        ON payment_master (
 DROP TRIGGER IF EXISTS trg_payment_master_updated_at ON payment_master;
 CREATE TRIGGER trg_payment_master_updated_at
     BEFORE UPDATE ON payment_master
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+--  EXPENSE MASTER
+--  Day-to-day business expenses (rent, salary, utilities, etc.)
+--  Money OUT that is not a supplier payment. Feeds Cash / Bank Book.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS expense_master (
+    id                  BIGSERIAL PRIMARY KEY,
+
+    expense_date        DATE           NOT NULL,
+    category            VARCHAR(100),       -- Rent / Salary / Electricity / Misc ...
+    description         TEXT,
+    amount              NUMERIC(12, 2) NOT NULL,
+
+    payment_mode_id     BIGINT REFERENCES payment_mode_master(id) ON DELETE SET NULL,
+    reference_no        VARCHAR(100),       -- voucher / bill no
+    notes               TEXT,
+
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_expense_master_expense_date ON expense_master (expense_date);
+CREATE INDEX IF NOT EXISTS idx_expense_master_category     ON expense_master (category);
+CREATE INDEX IF NOT EXISTS idx_expense_master_mode_id      ON expense_master (payment_mode_id);
+
+DROP TRIGGER IF EXISTS trg_expense_master_updated_at ON expense_master;
+CREATE TRIGGER trg_expense_master_updated_at
+    BEFORE UPDATE ON expense_master
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+--  SALES RETURN MASTER  (credit note — goods returned by customer)
+--  Restoring stock is handled in the app; the stock_ledger gets an
+--  IN row with reference_type = 'sale-return'.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS sales_return_master (
+    id              BIGSERIAL PRIMARY KEY,
+    return_no       VARCHAR(50),
+    return_date     DATE NOT NULL,
+
+    sales_id        BIGINT REFERENCES sales_master(id) ON DELETE SET NULL,
+    customer_id     BIGINT REFERENCES party_master(id) ON DELETE SET NULL,
+
+    total_amount    NUMERIC(12,2),   -- value of returned goods (incl. tax)
+    tax_amount      NUMERIC(10,2),
+    refund_amount   NUMERIC(12,2),   -- money actually refunded to customer
+    refund_mode_id  BIGINT REFERENCES payment_mode_master(id) ON DELETE SET NULL,
+    refund_status   VARCHAR(20),     -- Refunded / Pending / Adjusted
+
+    reason          VARCHAR(255),
+    notes           TEXT,
+
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    extra_data      JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_return_master_sales_id    ON sales_return_master (sales_id);
+CREATE INDEX IF NOT EXISTS idx_sales_return_master_customer_id ON sales_return_master (customer_id);
+CREATE INDEX IF NOT EXISTS idx_sales_return_master_return_date ON sales_return_master (return_date);
+
+DROP TRIGGER IF EXISTS trg_sales_return_master_updated_at ON sales_return_master;
+CREATE TRIGGER trg_sales_return_master_updated_at
+    BEFORE UPDATE ON sales_return_master
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+--  SALES RETURN ITEMS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS sales_return_items (
+    id              BIGSERIAL PRIMARY KEY,
+    return_id       BIGINT REFERENCES sales_return_master(id) ON DELETE CASCADE,
+
+    sales_item_id   BIGINT,          -- original sales_items.id (nullable)
+    item_id         BIGINT REFERENCES item_master(id) ON DELETE RESTRICT,
+    batch_no        VARCHAR(50),
+
+    quantity        NUMERIC(10,2),
+    mrp             NUMERIC(10,2),
+    sale_rate       NUMERIC(10,2),
+    gst_percent     NUMERIC(5,2),
+    tax_amount      NUMERIC(10,2),
+    total           NUMERIC(12,2),
+    expiry_date     DATE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_return_items_return_id     ON sales_return_items (return_id);
+CREATE INDEX IF NOT EXISTS idx_sales_return_items_item_id       ON sales_return_items (item_id);
+CREATE INDEX IF NOT EXISTS idx_sales_return_items_sales_item_id ON sales_return_items (sales_item_id);
+
+-- ============================================================
+--  HELD BILL  (parked / draft sales bill — NOT yet a real sale)
+--  No stock is touched until it is resumed and processed into a sale.
+--  `payload` holds the full editable draft so it can be resumed exactly.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS held_bill (
+    id              BIGSERIAL PRIMARY KEY,
+    hold_no         VARCHAR(50),
+    customer_id     BIGINT REFERENCES party_master(id) ON DELETE SET NULL,
+    customer_name   VARCHAR(255),
+    invoice_no      VARCHAR(50),
+    invoice_date    DATE,
+    doctor_name     VARCHAR(255),
+    payment_status  VARCHAR(20),
+    net_amount      NUMERIC(12,2),
+    item_count      INTEGER,
+    note            TEXT,
+    payload         JSONB,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_held_bill_customer_id ON held_bill (customer_id);
+CREATE INDEX IF NOT EXISTS idx_held_bill_created_at  ON held_bill (created_at);
+
+DROP TRIGGER IF EXISTS trg_held_bill_updated_at ON held_bill;
+CREATE TRIGGER trg_held_bill_updated_at
+    BEFORE UPDATE ON held_bill
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

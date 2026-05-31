@@ -1,0 +1,32 @@
+[
+  {
+    "sub_category_name": "Penicillin Antibiotics",
+    "category_id": 1,
+    "description": "Beta-lactam antibiotics derived from Penicillium fungi",
+    "is_active": true
+  },
+  {
+    "sub_category_name": "Biguanides",
+    "category_id": 2,
+    "description": "Oral antidiabetic drugs that lower blood glucose",
+    "is_active": true
+  },
+  {
+    "sub_category_name": "H1 Antihistamines",
+    "category_id": 3,
+    "description": "Drugs that block H1 histamine receptors for allergy relief",
+    "is_active": true
+  },
+  {
+    "sub_category_name": "ORS & Electrolytes",
+    "category_id": 4,
+    "description": "Oral rehydration salts and electrolyte replenishers",
+    "is_active": true
+  },
+  {
+    "sub_category_name": "NSAIDs",
+    "category_id": 5,
+    "description": "Non-steroidal anti-inflammatory drugs for pain and inflammation",
+    "is_active": true
+  }
+]
