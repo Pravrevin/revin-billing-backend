@@ -37,7 +37,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db
 from app.models.party_master import PartyMaster
 from app.models.purchase_master import PurchaseMaster
 from app.models.purchase_payment import PartyCreditConfig, PaymentMaster

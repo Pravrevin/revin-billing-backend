@@ -77,3 +77,16 @@ class PartyMasterResponse(PartyMasterBase):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class GstLookupResponse(BaseModel):
+    """Supplier details resolved from a GSTIN, mapped to Add Supplier fields."""
+    gstin:      str
+    pan_card:   Optional[str] = None
+    party_name: Optional[str] = None
+    address:    Optional[str] = None
+    state:      Optional[str] = None
+    city:       Optional[str] = None
+    pincode:    Optional[str] = None
+    status:     Optional[str] = Field(None, description="Registration status, e.g. Active")
+    source:     str = Field(..., description='"appyflow" for full details, "derived" when only state/PAN are known')

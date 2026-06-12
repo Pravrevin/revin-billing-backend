@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db
 from app.models.item_master import ItemMaster
 from app.models.party_master import PartyMaster
 from app.models.payment_mode_master import PaymentModeMaster

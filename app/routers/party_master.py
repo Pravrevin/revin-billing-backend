@@ -3,9 +3,16 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db
 from app.models.party_master import PartyMaster
-from app.schemas.party_master import PartyMasterCreate, PartyMasterResponse, PartyMasterUpdate, PartyType
+from app.schemas.party_master import (
+    GstLookupResponse,
+    PartyMasterCreate,
+    PartyMasterResponse,
+    PartyMasterUpdate,
+    PartyType,
+)
+from app.services.gst_lookup import GstLookupError, lookup_gstin
 
 router = APIRouter(prefix="/party-master", tags=["Party Master"])
 
@@ -38,6 +45,23 @@ def _generate_party_code(db: Session, party_type: PartyType) -> str:
 def get_party_types():
     """Returns the allowed party types."""
     return [t.value for t in PartyType]
+
+
+@router.get("/gst-lookup/{gstin}", response_model=GstLookupResponse)
+def gst_lookup(gstin: str):
+    """
+    Validate a GSTIN and resolve supplier details for the Add Supplier form.
+
+    Returns derived data (state + PAN) when no provider key is configured, and
+    full taxpayer details (name, address, city, pincode) when it is.
+    """
+    try:
+        return lookup_gstin(gstin)
+    except GstLookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
 
 
 @router.post("/", response_model=PartyMasterResponse, status_code=status.HTTP_201_CREATED)

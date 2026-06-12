@@ -1,5 +1,10 @@
 import os
 
+from dotenv import load_dotenv
+
+# Load environment variables from .env (e.g. GROQ_API_KEY) before anything imports them.
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -7,7 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from app.routers import item_master, party_master, payment_mode_master, stock_master, purchase, sales
 from app.routers import purchase_payment, party_credit_config
 from app.routers import category_master, packaging_master, brand_master, unit_master
-from app.routers import reports, accounts, expense, sales_return, held_bill, sales_summary
+from app.routers import reports, accounts, expense, sales_return, held_bill, sales_summary, assistant
+from app.routers import auth, admin
 
 app = FastAPI(
     title="Billing Software API",
@@ -23,6 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router,                prefix="/api/v1")
+app.include_router(admin.router,               prefix="/api/v1")
 app.include_router(category_master.router,     prefix="/api/v1")
 app.include_router(packaging_master.router,    prefix="/api/v1")
 app.include_router(brand_master.router,        prefix="/api/v1")
@@ -40,6 +48,7 @@ app.include_router(sales.router,               prefix="/api/v1")
 app.include_router(sales_return.router,        prefix="/api/v1")
 app.include_router(held_bill.router,           prefix="/api/v1")
 app.include_router(sales_summary.router,       prefix="/api/v1")
+app.include_router(assistant.router,           prefix="/api/v1")
 app.include_router(party_credit_config.router, prefix="/api/v1")
 app.include_router(reports.router,             prefix="/api/v1")
 app.include_router(accounts.router,            prefix="/api/v1")

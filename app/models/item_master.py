@@ -5,7 +5,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
-from app.database import Base
+from app.database import TenantBase as Base
 
 
 class ItemMaster(Base):

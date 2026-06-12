@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db
 from app.models.unit_master import UnitMaster
 from app.schemas.unit_master import (
     UnitMasterCreate, UnitMasterResponse, UnitMasterUpdate,

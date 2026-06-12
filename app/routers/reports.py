@@ -16,14 +16,15 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db, require_menu
 from app.models.item_master import ItemMaster
 from app.models.party_master import PartyMaster
 from app.models.purchase_master import PurchaseItem, PurchaseMaster
 from app.models.sales_master import SalesItem, SalesMaster
 from app.models.stock_master import StockMaster
 
-router = APIRouter(prefix="/reports", tags=["Reports"])
+# Menu 7 = Reports (see frontend menus.ts)
+router = APIRouter(prefix="/reports", tags=["Reports"], dependencies=[Depends(require_menu(7))])
 
 NEAR_EXPIRY_DAYS = 30
 

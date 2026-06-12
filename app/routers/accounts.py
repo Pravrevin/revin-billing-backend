@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db, require_menu
 from app.models.expense import ExpenseMaster
 from app.models.party_master import PartyMaster
 from app.models.payment_mode_master import PaymentModeMaster
@@ -31,7 +31,8 @@ from app.models.purchase_master import PurchaseMaster
 from app.models.purchase_payment import PartyCreditConfig, PaymentMaster
 from app.models.sales_master import SalesMaster
 
-router = APIRouter(prefix="/accounts", tags=["Accounts"])
+# Menu 6 = Accounts / Payments (see frontend menus.ts)
+router = APIRouter(prefix="/accounts", tags=["Accounts"], dependencies=[Depends(require_menu(6))])
 
 # Modes that are neither cash nor a real money movement are excluded from books.
 _NON_BANK = {"cash", "credit"}

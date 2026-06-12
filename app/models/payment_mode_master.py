@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, Column, String, TIMESTAMP
 
-from app.database import Base
+from app.database import TenantBase as Base
 
 
 class PaymentModeMaster(Base):

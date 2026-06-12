@@ -1,11 +1,12 @@
+import os
 from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db
 from app.models.party_master import PartyMaster
 from app.models.purchase_master import PurchaseItem, PurchaseMaster
 from app.models.stock_master import StockLedger, StockMaster
@@ -16,8 +17,13 @@ from app.schemas.purchase import (
     PurchaseMasterUpdate,
 )
 from app.schemas.stock_master import StockLedgerResponse
+from app.services.bill_mapper import map_extraction_to_purchase
+from app.services.pdf_extractor import IMAGE_MIME_TYPES, PdfExtractor
 
 router = APIRouter(prefix="/purchases", tags=["Purchase"])
+
+# Max upload size per file (10 MB) for AI bill extraction.
+_MAX_BILL_FILE_BYTES = 10 * 1024 * 1024
 
 
 def _generate_invoice_no(db: Session) -> str:
@@ -152,6 +158,86 @@ def create_purchase(payload: PurchaseMasterCreate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(purchase)
     return purchase
+
+
+@router.post("/extract-bill")
+async def extract_bill(files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
+    """
+    Run AI (Mistral OCR + LLM) over an uploaded supplier bill and return a
+    prefill payload for the purchase-entry form.
+
+    Accepts one of:
+      • a single PDF (any number of pages), or
+      • a single image, or
+      • multiple images (e.g. a multi-page scan, up to 10).
+
+    The response maps the extracted table onto purchase line fields and
+    best-effort-matches the supplier and each medicine against the masters.
+    Unmatched items still come back (with extracted_name) for manual picking.
+    """
+    if not files:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file uploaded.")
+
+    # Read + classify every uploaded file.
+    pdfs: List[bytes] = []
+    images: List[tuple[bytes, str]] = []
+    image_names: List[str] = []
+    for f in files:
+        content = await f.read()
+        if not content:
+            continue
+        if len(content) > _MAX_BILL_FILE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"'{f.filename}' is larger than 10 MB.",
+            )
+        ext = os.path.splitext(f.filename or "")[1].lower()
+        ctype = (f.content_type or "").lower()
+        if ext == ".pdf" or ctype == "application/pdf":
+            pdfs.append(content)
+        elif ext in IMAGE_MIME_TYPES or ctype.startswith("image/"):
+            mime = IMAGE_MIME_TYPES.get(ext) or (ctype if ctype.startswith("image/") else "image/jpeg")
+            images.append((content, mime))
+            image_names.append(f.filename or f"image-{len(image_names) + 1}")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file '{f.filename}'. Upload a PDF or image(s).",
+            )
+
+    if not pdfs and not images:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No readable file content.")
+    if pdfs and images:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload either a single PDF or one-or-more images — not both at once.",
+        )
+    if len(pdfs) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please upload only one PDF at a time.",
+        )
+    if len(images) > 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum 10 images per bill.",
+        )
+
+    extractor = PdfExtractor()
+    try:
+        if pdfs:
+            extraction = await extractor.extract_from_pdf_bytes(pdfs[0])
+        elif len(images) == 1:
+            extraction = await extractor.extract_from_image_bytes(images[0][0], images[0][1])
+        else:
+            extraction = await extractor.extract_from_images_bytes(images, image_names)
+    except Exception as exc:  # OCR/LLM failures → 502 with the message surfaced
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Bill extraction failed: {exc}",
+        )
+
+    return map_extraction_to_purchase(extraction, db)
 
 
 @router.get("/", response_model=List[PurchaseMasterResponse])

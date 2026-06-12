@@ -10,11 +10,12 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db, require_menu
 from app.models.expense import ExpenseMaster
 from app.schemas.expense import ExpenseCreate, ExpenseResponse, ExpenseUpdate
 
-router = APIRouter(prefix="/expenses", tags=["Expenses"])
+# Menu 6 = Accounts / Payments (Expense Entry lives under it)
+router = APIRouter(prefix="/expenses", tags=["Expenses"], dependencies=[Depends(require_menu(6))])
 
 # A sensible default category list the UI can offer alongside any already used.
 DEFAULT_CATEGORIES = [

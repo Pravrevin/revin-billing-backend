@@ -4,7 +4,7 @@ from sqlalchemy import BigInteger, Column, Date, ForeignKey, Integer, Numeric, S
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
-from app.database import Base
+from app.database import TenantBase as Base
 
 
 class HeldBill(Base):

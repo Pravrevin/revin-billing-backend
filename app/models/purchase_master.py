@@ -3,7 +3,7 @@ from sqlalchemy import BigInteger, Column, Date, ForeignKey, Numeric, String, TI
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
-from app.database import Base
+from app.database import TenantBase as Base
 
 
 class PurchaseMaster(Base):

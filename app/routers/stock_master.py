@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db
 from app.models.item_master import ItemMaster
 from app.models.stock_master import StockLedger, StockMaster
 from app.schemas.stock_master import (

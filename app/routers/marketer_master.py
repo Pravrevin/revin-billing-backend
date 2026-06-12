@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.auth.deps import get_tenant_db as get_db
 from app.models.marketer_master import MarketerMaster
 from app.schemas.marketer_master import (
     MarketerMasterCreate, MarketerMasterResponse, MarketerMasterUpdate,

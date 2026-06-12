@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, Column, Integer, Numeric, String, Text, TIMESTAMP
 from sqlalchemy.dialects.postgresql import JSONB
 
-from app.database import Base
+from app.database import TenantBase as Base
 
 
 class PartyMaster(Base):
